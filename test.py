@@ -1,16 +1,10 @@
-import cairo
-
+from drafter.report import PngReport
 from drafter.node import Node
 from drafter.nodes.text import Text
 from drafter.layouts.row import Row
 from drafter.nodes.auto_scale import AutoScale
 from drafter.utils.pos_size import Justify
 
-
-surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
-dirty_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 256, 256)
-ctx = cairo.Context(surface)
-dirty_ctx = cairo.Context(dirty_surface)
 
 root = Row(
     width='100%',
@@ -45,19 +39,4 @@ root = Row(
     ]
 )
 
-body = {
-    'w': 256,
-    'h': 256,
-    'x': 0,
-    'y': 0,
-    'rx': 0,
-    'ry': 0,
-}
-root.draw({
-    'ctx': ctx,
-    'dirty_ctx': dirty_ctx,
-    'parent': body,
-    'abs_parent': body
-})
-
-surface.write_to_png('test.png')
+PngReport('test.png', 256, 256).draw_page(root)
