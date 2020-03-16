@@ -1,4 +1,5 @@
 import cairo
+from drafter.utils.color import parse_color
 
 
 class Border:
@@ -16,7 +17,7 @@ class Border:
     ):
         self.radius = radius
         self.width = width
-        self.color = color
+        self.color = parse_color(color)
         self.line_cap = line_cap
         self.line_dash = line_dash
 

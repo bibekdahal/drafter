@@ -5,6 +5,7 @@ gi.require_version('PangoCairo', '1.0')  # noqa
 from gi.repository import Pango, PangoCairo
 from drafter.node import Node
 from drafter.utils.font import get_font_desc
+from drafter.utils.color import parse_color
 
 
 class Text(Node):
@@ -86,7 +87,7 @@ class Text(Node):
                 ctx.translate(x, y)
         else:
             ctx.translate(x, y)
-        ctx.set_source_rgba(*self.color)
+        ctx.set_source_rgba(*parse_color(self.color))
         PangoCairo.show_layout(ctx, layout)
         ctx.restore()
 

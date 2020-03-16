@@ -1,5 +1,6 @@
 from drafter.utils.rect import default_rect
 from drafter.utils.pos_size import Position, calc_size, calc_rect_size
+from drafter.utils.color import parse_color
 
 
 class Node:
@@ -27,7 +28,7 @@ class Node:
 
         if self.background is not None:
             ctx.rectangle(x, y, w, h)
-            ctx.set_source_rgba(*self.background)
+            ctx.set_source_rgba(*parse_color(self.background))
             ctx.fill()
 
         if self.border is not None:
