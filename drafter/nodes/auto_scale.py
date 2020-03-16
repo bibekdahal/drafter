@@ -8,13 +8,11 @@ class AutoScale(Node):
 
     def pre_draw(self, context, draw_pass):
         if draw_pass == 1:
-            self.child_width = 0
-            self.child_height = 0
             return
 
         me = self.last_pass_context['parent']
         tw, th = me['w'], me['h']
-        cw, ch = self.child_width, self.child_height
+        cw, ch = self.children_width, self.children_height
         sx, sy = 1, 1
 
         if self.horizontal:
@@ -32,8 +30,3 @@ class AutoScale(Node):
 
         ctx = context['ctx']
         ctx.restore()
-
-    def update(self, context, child_context, child_response, draw_pass):
-        self.child_width += child_response['dx']
-        self.child_height += child_response['dy']
-        super().update(context, child_context, child_response, draw_pass)
