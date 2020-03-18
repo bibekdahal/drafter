@@ -1,9 +1,41 @@
+# node.py
+# Author: Bibek Dahal
+
 from drafter.utils.rect import default_rect
 from drafter.utils.pos_size import Position, calc_size, calc_rect_size
 from drafter.utils.color import parse_color
 
 
 class Node:
+    """
+    Anything that can be drafted is a Node.
+
+    It can be text, a layouting container or a canvas.
+    Each node takes a rectangular area in screen, draws some content in that
+    area and can have children nodes, which are drawn recursively inside it.
+    It can have a width and a height, which can either be some percentage
+    of the parent node, a fixed number or None to specify automatic scaling
+    based on content.
+
+    A node can also have margin (to separate from neighbouring nodes),
+    background (a color to fill the rectangular area it occupies), border
+    (strokes around the perimeter of the rectangular area) and padding
+    (spacing between the perimeter and the drawn content).
+
+    Default properties:
+    -------------------
+    children: Children of these node.
+    background: Background color of this node.
+    width: Width of the node. Can be fixed value, percentage or None.
+    height: Height of the node. Can be fixed value, percentage or None.
+    margin: Rect object, defining spacing around this element, outside
+            the border.
+    padding: Rect object, defining spacing around this element's content,
+             inside the border.
+    border: Border object, defining the width, radius and color of the border.
+    position: One of (STATIC, ABSOLUTE, RELATIVE), similar to CSS position
+              property.
+    """
     children = []
     background = None
     width, height = None, None
@@ -11,68 +43,96 @@ class Node:
     padding = default_rect
     border = None
     position = Position.STATIC
-    max_draw_pass = 1
+    tag = 'N/A'
+
+    # Default minimum number of drawing passes is 1.
+    min_draw_pass = 1
 
     def __init__(self, **kwargs):
+        """
+        On constructing any Node, the default properties can be overriden using
+        kwargs.
+        """
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def draw_border_and_background(self, ctx, x, y, w, h):
+        """
+        Draw a border and background for this node.
+        This function also returns the position and size of the inner
+        rectangle after padding, where the actual content goes.
+        """
+
+        # Calculate the x, y, w, h of the inner rectangle after padding.
         xx = x + self.padding.left
         yy = y + self.padding.top
         ww = w - self.padding.left - self.padding.right
         hh = h - self.padding.top - self.padding.bottom
 
-        ctx.save()
-        ctx.identity_matrix()
-
+        # Draw the background.
         if self.background is not None:
             ctx.rectangle(x, y, w, h)
             ctx.set_source_rgba(*parse_color(self.background))
             ctx.fill()
 
+        # Draw the border.
         if self.border is not None:
             self.border.draw(ctx, x, y, w, h)
 
-        ctx.restore()
         return xx, yy, ww, hh
 
     def draw_content(self, ctx, x, y, w, h):
+        """
+        By default, draws nothing.
+        """
         return w, h
 
     def pre_update(self, context, child_context, draw_pass):
+        """
+        Called before drawing any child.
+        """
         pass
 
     def update(self, context, child_context, child_response, draw_pass):
-        parent = child_context['parent']
-        parent['rx'] += child_response['dx']
+        """
+        Called after drawing each child.
+        By default, update the relative position to draw the next child.
+        """
+        me = child_context['parent']
+        me['rx'] += child_response['dx']
 
-    def pre_draw(self, context, draw_pass):
+    def pre_draw(self, context, draw_pass, dirty):
+        """
+        Called before drawing any content.
+        """
         pass
 
-    def post_draw(self, context, draw_pass):
+    def post_draw(self, context, draw_pass, dirty):
+        """
+        Called after drawing all the content and the children.
+        """
         pass
 
-    def draw(self, context, draw_pass=1, dirty=False):
+    def draw(self, context, draw_pass=1, force_dirty=False):
         """
         Drawing can occur in several passes to establish the final layout.
 
         Following are the cases when multiple drawing passes can occur:
 
         - This is the first pass but the width or height of this node
-          is not known. In such a case, we render all the content and the
-          children and save their total width/height for the next pass.
-          This width/height is necessary for drawing background, border as
-          well as may be necessary for this node's parent.
+          is unknown. In such a case, we render all the content and the
+          children and save their total size for the next pass.
+          This size is necessary for drawing background and border.
+          It may also be necessary for this node's parent.
 
-         - This node always requires two passes. For example, to justify
+         - This node actually requires two passes. For example, to justify
            content between children nodes in the 'Row' node or to
-           fit the content in the 'AutoScale' node. Both of these cases
+           fit the content in the 'AutoScale' node. Both of them
            require the size of the children, so the children need to be drawn
-           in the first pass.
+           in the first pass to figure out the size.
          """
 
-        # We are drawing either with respect to immediate parent
+        # We are drawing either with respect to the immediate parent
         # or with respect to the nearest absolute parent.
         parent = context['parent']
         abs_parent = context['abs_parent']
@@ -85,14 +145,14 @@ class Node:
             pos_x = parent['x'] + parent['rx']
             pos_y = parent['y'] + parent['ry']
 
-        # Make sure to consider margin when finding this node's position.
+        # Make sure to consider margin when drawing this node.
         margin = calc_rect_size(parent['w'], parent['h'], self.margin)
         x = pos_x + margin.left
         y = pos_y + margin.top
 
         if draw_pass > 1:
-            # If this is not the first pass, then for width and height,
-            # we will consider the final width and height of the last pass.
+            # For subsequent passes after the first pass,
+            # we will consider the final width and height from the last pass.
             w = self.last_pass_context['parent']['w']
             h = self.last_pass_context['parent']['h']
         else:
@@ -114,13 +174,13 @@ class Node:
 
         # We will draw in the dirty surface in 2 cases:
         # - Our parent is drawing in the dirty surface, so dirty = True
-        # - This is not the first pass, either because this node requires
-        #   more passes or because width or height of this node is not known.
-        dirty = dirty or (draw_pass < self.max_draw_pass) or size_undetected
+        # - This is not the last pass.
+        needs_more_passes = (draw_pass < self.min_draw_pass) or size_undetected
+        dirty = force_dirty or needs_more_passes
 
-        # Before drawing,
+        # Before drawing anything,
         # if the specific node wants to do something, do it here.
-        self.pre_draw(context, draw_pass)
+        self.pre_draw(context, draw_pass, dirty)
 
         if dirty:
             # Drawing on the dirty surface.
@@ -162,7 +222,7 @@ class Node:
         # Let's save the total children width and height for subsequent passes.
         self.children_width = 0
         self.children_height = 0
-        for c in self.children:
+        for ci, c in enumerate(self.children):
             # Draw each child.
             child_response = c.draw(child_context, 1, dirty)
             # Update total children size based on the returned values.
@@ -176,7 +236,7 @@ class Node:
 
         # After everything is drawn,
         # if the specific node wants to do something, do it here.
-        self.post_draw(context, draw_pass)
+        self.post_draw(context, draw_pass, dirty)
 
         # If a size was previously unknown
         # and this is the first pass, we will save the content/children size
@@ -187,9 +247,9 @@ class Node:
             this_parent['h'] = max(h, self.children_height)
 
         # If we need to draw another pass, draw it.
-        if draw_pass < self.max_draw_pass or size_undetected:
+        if needs_more_passes:
             self.last_pass_context = child_context
-            return self.draw(context, draw_pass + 1)
+            return self.draw(context, draw_pass + 1, force_dirty)
 
         # Return the total space taken by this child.
         if self.position == Position.ABSOLUTE:
@@ -199,6 +259,6 @@ class Node:
             }
         else:
             return {
-                'dx': w + margin.left + margin.right,
-                'dy': h + margin.top + margin.bottom,
+                'dx': this_parent['w'] + margin.left + margin.right,
+                'dy': this_parent['h'] + margin.top + margin.bottom,
             }

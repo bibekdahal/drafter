@@ -8,6 +8,12 @@ class Justify:
     END = 3
 
 
+class Align:
+    START = 0
+    CENTER = 1
+    END = 2
+
+
 class Position:
     STATIC = 0
     ABSOLUTE = 1

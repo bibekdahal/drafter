@@ -12,7 +12,7 @@ class Border:
         radius=0,
         width=0,
         color=[0, 0, 0, 1],
-        line_cap=CAP_BUTT,
+        line_cap=CAP_SQUARE,
         line_dash=[],
     ):
         self.radius = radius
@@ -24,6 +24,8 @@ class Border:
     def draw(self, ctx, x, y, w, h, preserve=True):
         if self.width == 0:
             return
+
+        # TODO: Fix to draw in the inner rectangle.
         r = self.radius
         ctx.move_to(x+r, y)
         ctx.line_to(x+w-r, y)
